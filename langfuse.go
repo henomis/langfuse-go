@@ -20,13 +20,8 @@ type Langfuse struct {
 	flushInterval time.Duration
 	client        *api.Client
 	observer      *observer.Observer[model.IngestionEvent]
+	path          *path.Path
 }
-
-type langfuseCtxValue string
-
-const (
-	langfuseCtxValuePath langfuseCtxValue = "langfusePath"
-)
 
 func New() *Langfuse {
 	client := api.New()
@@ -42,6 +37,7 @@ func New() *Langfuse {
 				}
 			},
 		),
+		path: &path.Path{},
 	}
 
 	return l
@@ -61,7 +57,7 @@ func ingest(client *api.Client, events []model.IngestionEvent) error {
 	return client.Ingestion(context.Background(), &req, &res)
 }
 
-func (l *Langfuse) Trace(ctx context.Context, t *model.Trace) (context.Context, error) {
+func (l *Langfuse) Trace(ctx context.Context, t *model.Trace) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeTraceCreate,
@@ -73,15 +69,15 @@ func (l *Langfuse) Trace(ctx context.Context, t *model.Trace) (context.Context, 
 	}
 
 	event.Body = t
-	ctx = context.WithValue(ctx, langfuseCtxValuePath, path.Path{path.Element{Type: path.Trace, ID: t.ID}})
+	l.path = &path.Path{path.Element{Type: path.Trace, ID: t.ID}}
 
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
 //nolint:dupl
-func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) (context.Context, error) {
+func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeGenerationCreate,
@@ -94,44 +90,39 @@ func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) (context
 
 	traceID, err := l.extractTraceID(ctx, g.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	g.TraceID = traceID
 
+	if l.path.Last().Type != path.Trace {
+		g.ParentObservationID = l.path.Last().ID
+	}
+
 	event.Body = g
 
-	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
-		if p.Last().Type != path.Trace {
-			g.ParentObservationID = p.Last().ID
-		}
-		p.Push(path.Generation, g.ID)
-		ctx = context.WithValue(ctx, langfuseCtxValuePath, p)
-	}
+	l.path.Push(path.Generation, g.ID)
 
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
 //nolint:dupl
-func (l *Langfuse) GenerationEnd(ctx context.Context, g *model.Generation) (context.Context, error) {
-	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
-		e, pathErr := p.PopIf(path.Generation)
-		if pathErr != nil {
-			return nil, fmt.Errorf("invalid path: %w", pathErr)
-		}
-		ctx = context.WithValue(ctx, langfuseCtxValuePath, p)
-
-		g.ID = e.ID
-		g.TraceID = p.At(0).ID
+func (l *Langfuse) GenerationEnd(ctx context.Context, g *model.Generation) error {
+	generation, err := l.path.PopIf(path.Generation)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
 	}
 
+	g.ID = generation.ID
+	g.TraceID = l.path.At(0).ID
+
 	if g.ID == "" {
-		return nil, fmt.Errorf("generation ID is required")
+		return fmt.Errorf("generation ID is required")
 	}
 
 	if g.TraceID == "" {
-		return nil, fmt.Errorf("trace ID is required")
+		return fmt.Errorf("trace ID is required")
 	}
 
 	event := model.IngestionEvent{
@@ -144,10 +135,10 @@ func (l *Langfuse) GenerationEnd(ctx context.Context, g *model.Generation) (cont
 
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
-func (l *Langfuse) Score(ctx context.Context, s *model.Score) (context.Context, error) {
+func (l *Langfuse) Score(ctx context.Context, s *model.Score) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeScoreCreate,
@@ -160,18 +151,18 @@ func (l *Langfuse) Score(ctx context.Context, s *model.Score) (context.Context, 
 
 	traceID, err := l.extractTraceID(ctx, s.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	s.TraceID = traceID
 
 	event.Body = s
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
 //nolint:dupl
-func (l *Langfuse) Span(ctx context.Context, s *model.Span) (context.Context, error) {
+func (l *Langfuse) Span(ctx context.Context, s *model.Span) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeSpanCreate,
@@ -184,43 +175,39 @@ func (l *Langfuse) Span(ctx context.Context, s *model.Span) (context.Context, er
 
 	traceID, err := l.extractTraceID(ctx, s.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	s.TraceID = traceID
 
-	event.Body = s
-	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
-		if p.Last().Type != path.Trace {
-			s.ParentObservationID = p.Last().ID
-		}
-		p.Push(path.Span, s.ID)
-		ctx = context.WithValue(ctx, langfuseCtxValuePath, p)
+	if l.path.Last().Type != path.Trace {
+		s.ParentObservationID = l.path.Last().ID
 	}
+
+	l.path.Push(path.Span, s.ID)
+
+	event.Body = s
 
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
 //nolint:dupl
-func (l *Langfuse) SpanEnd(ctx context.Context, s *model.Span) (context.Context, error) {
-	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
-		e, pathErr := p.PopIf(path.Span)
-		if pathErr != nil {
-			return nil, fmt.Errorf("invalid path: %w", pathErr)
-		}
-		ctx = context.WithValue(ctx, langfuseCtxValuePath, p)
-
-		s.ID = e.ID
-		s.TraceID = p.At(0).ID
+func (l *Langfuse) SpanEnd(ctx context.Context, s *model.Span) error {
+	span, err := l.path.PopIf(path.Span)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
 	}
 
+	s.ID = span.ID
+	s.TraceID = l.path.At(0).ID
+
 	if s.ID == "" {
-		return nil, fmt.Errorf("span ID is required")
+		return fmt.Errorf("span ID is required")
 	}
 
 	if s.TraceID == "" {
-		return nil, fmt.Errorf("trace ID is required")
+		return fmt.Errorf("trace ID is required")
 	}
 
 	event := model.IngestionEvent{
@@ -233,10 +220,10 @@ func (l *Langfuse) SpanEnd(ctx context.Context, s *model.Span) (context.Context,
 
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
-func (l *Langfuse) Event(ctx context.Context, e *model.Event) (context.Context, error) {
+func (l *Langfuse) Event(ctx context.Context, e *model.Event) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeEventCreate,
@@ -249,30 +236,27 @@ func (l *Langfuse) Event(ctx context.Context, e *model.Event) (context.Context, 
 
 	traceID, err := l.extractTraceID(ctx, e.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	e.TraceID = traceID
 
-	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
-		if p.Last().Type != path.Trace {
-			e.ParentObservationID = p.Last().ID
-		}
+	if l.path.Last().Type != path.Trace {
+		e.ParentObservationID = l.path.Last().ID
 	}
 
 	event.Body = e
 	l.observer.Dispatch(event)
 
-	return ctx, nil
+	return nil
 }
 
 func (l *Langfuse) extractTraceID(ctx context.Context, traceName string) (string, error) {
-	extractedTraceID := ""
-	if path, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
-		extractedTraceID = path.At(0).ID
-		return extractedTraceID, nil
+	tracePath := l.path.At(0)
+	if tracePath != nil {
+		return tracePath.ID, nil
 	}
 
-	ctxTrace, errTrace := l.Trace(
+	errTrace := l.Trace(
 		ctx,
 		&model.Trace{
 			Name: traceName,
@@ -282,12 +266,12 @@ func (l *Langfuse) extractTraceID(ctx context.Context, traceName string) (string
 		return "", errTrace
 	}
 
-	if path, ok := ctxTrace.Value(langfuseCtxValuePath).(path.Path); ok {
-		extractedTraceID = path.At(0).ID
-		return extractedTraceID, nil
+	tracePath = l.path.At(0)
+	if tracePath != nil {
+		return tracePath.ID, nil
 	}
 
-	return extractedTraceID, nil
+	return "", fmt.Errorf("unable to get trace ID")
 }
 
 func (l *Langfuse) Flush(ctx context.Context) {

@@ -12,17 +12,17 @@ type Response struct {
 	Code      int       `json:"-"`
 	RawBody   *string   `json:"-"`
 	Successes []Success `json:"successes"`
-	Errors    []Error   `json:"error"`
+	Errors    []Error   `json:"errors"`
 }
 
 type Success struct {
 	ID     string `json:"id"`
-	Status string `json:"status"`
+	Status int    `json:"status"`
 }
 
 type Error struct {
 	ID      string `json:"id"`
-	Status  string `json:"status"`
+	Status  int    `json:"status"`
 	Message string `json:"message"`
 	Error   string `json:"error"`
 }

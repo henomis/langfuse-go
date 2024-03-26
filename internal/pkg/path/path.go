@@ -45,8 +45,11 @@ func (p *Path) PopIf(t Type) (*Element, error) {
 	return &lastElement, nil
 }
 
-func (p *Path) At(i int) Element {
-	return (*p)[i]
+func (p *Path) At(i int) *Element {
+	if i < 0 || i >= len(*p) {
+		return nil
+	}
+	return &(*p)[i]
 }
 
 func (p *Path) Last() Element {
