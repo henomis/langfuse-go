@@ -8,31 +8,19 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
 	l := langfuse.New()
 
-	err := l.Trace(
-		ctx,
-		&model.Trace{
-			Name: "test-trace",
-		},
-	)
+	err := l.Trace(&model.Trace{Name: "test-trace"})
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.Span(
-		ctx,
-		&model.Span{
-			Name: "test-span",
-		},
-	)
+	err = l.Span(&model.Span{Name: "test-span"})
 	if err != nil {
 		panic(err)
 	}
 
 	err = l.Generation(
-		ctx,
 		&model.Generation{
 			Name:  "test-generation",
 			Model: "gpt-3.5-turbo",
@@ -60,7 +48,6 @@ func main() {
 	}
 
 	err = l.Event(
-		ctx,
 		&model.Event{
 			Name: "test-event",
 			Metadata: model.M{
@@ -79,7 +66,6 @@ func main() {
 	}
 
 	err = l.GenerationEnd(
-		ctx,
 		&model.Generation{
 			Output: model.M{
 				"completion": "The Q3 OKRs contain goals for multiple teams...",
@@ -91,7 +77,6 @@ func main() {
 	}
 
 	err = l.Score(
-		ctx,
 		&model.Score{
 			Name:  "test-score",
 			Value: 0.9,
@@ -101,10 +86,7 @@ func main() {
 		panic(err)
 	}
 
-	err = l.SpanEnd(
-		ctx,
-		&model.Span{},
-	)
+	err = l.SpanEnd(&model.Span{})
 	if err != nil {
 		panic(err)
 	}

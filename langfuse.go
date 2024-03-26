@@ -57,7 +57,7 @@ func ingest(client *api.Client, events []model.IngestionEvent) error {
 	return client.Ingestion(context.Background(), &req, &res)
 }
 
-func (l *Langfuse) Trace(ctx context.Context, t *model.Trace) error {
+func (l *Langfuse) Trace(t *model.Trace) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeTraceCreate,
@@ -77,7 +77,7 @@ func (l *Langfuse) Trace(ctx context.Context, t *model.Trace) error {
 }
 
 //nolint:dupl
-func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) error {
+func (l *Langfuse) Generation(g *model.Generation) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeGenerationCreate,
@@ -88,7 +88,7 @@ func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) error {
 		g.ID = traceID
 	}
 
-	traceID, err := l.extractTraceID(ctx, g.Name)
+	traceID, err := l.extractTraceID(g.Name)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) error {
 }
 
 //nolint:dupl
-func (l *Langfuse) GenerationEnd(ctx context.Context, g *model.Generation) error {
+func (l *Langfuse) GenerationEnd(g *model.Generation) error {
 	generation, err := l.path.PopIf(path.Generation)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
@@ -138,7 +138,7 @@ func (l *Langfuse) GenerationEnd(ctx context.Context, g *model.Generation) error
 	return nil
 }
 
-func (l *Langfuse) Score(ctx context.Context, s *model.Score) error {
+func (l *Langfuse) Score(s *model.Score) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeScoreCreate,
@@ -149,7 +149,7 @@ func (l *Langfuse) Score(ctx context.Context, s *model.Score) error {
 		s.ID = traceID
 	}
 
-	traceID, err := l.extractTraceID(ctx, s.Name)
+	traceID, err := l.extractTraceID(s.Name)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func (l *Langfuse) Score(ctx context.Context, s *model.Score) error {
 }
 
 //nolint:dupl
-func (l *Langfuse) Span(ctx context.Context, s *model.Span) error {
+func (l *Langfuse) Span(s *model.Span) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeSpanCreate,
@@ -173,7 +173,7 @@ func (l *Langfuse) Span(ctx context.Context, s *model.Span) error {
 		s.ID = traceID
 	}
 
-	traceID, err := l.extractTraceID(ctx, s.Name)
+	traceID, err := l.extractTraceID(s.Name)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (l *Langfuse) Span(ctx context.Context, s *model.Span) error {
 }
 
 //nolint:dupl
-func (l *Langfuse) SpanEnd(ctx context.Context, s *model.Span) error {
+func (l *Langfuse) SpanEnd(s *model.Span) error {
 	span, err := l.path.PopIf(path.Span)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
@@ -223,7 +223,7 @@ func (l *Langfuse) SpanEnd(ctx context.Context, s *model.Span) error {
 	return nil
 }
 
-func (l *Langfuse) Event(ctx context.Context, e *model.Event) error {
+func (l *Langfuse) Event(e *model.Event) error {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
 		Type:      model.IngestionEventTypeEventCreate,
@@ -234,7 +234,7 @@ func (l *Langfuse) Event(ctx context.Context, e *model.Event) error {
 		e.ID = traceID
 	}
 
-	traceID, err := l.extractTraceID(ctx, e.Name)
+	traceID, err := l.extractTraceID(e.Name)
 	if err != nil {
 		return err
 	}
@@ -250,14 +250,13 @@ func (l *Langfuse) Event(ctx context.Context, e *model.Event) error {
 	return nil
 }
 
-func (l *Langfuse) extractTraceID(ctx context.Context, traceName string) (string, error) {
+func (l *Langfuse) extractTraceID(traceName string) (string, error) {
 	tracePath := l.path.At(0)
 	if tracePath != nil {
 		return tracePath.ID, nil
 	}
 
 	errTrace := l.Trace(
-		ctx,
 		&model.Trace{
 			Name: traceName,
 		},
