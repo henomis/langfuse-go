@@ -61,7 +61,7 @@ func main() {
 	ctx := context.Background()
 	l := langfuse.New()
 
-	ctx, err := l.Trace(
+	err := l.Trace(
 		ctx,
 		&model.Trace{
 			Name: "test-trace",
@@ -70,9 +70,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
 
-	ctx, err = l.Span(
+	err = l.Span(
 		ctx,
 		&model.Span{
 			Name: "test-span",
@@ -82,7 +81,7 @@ func main() {
 		panic(err)
 	}
 
-	ctx, err = l.Generation(
+	err = l.Generation(
 		ctx,
 		&model.Generation{
 			Name:  "test-generation",
@@ -110,30 +109,7 @@ func main() {
 		panic(err)
 	}
 
-	ctx, err = l.GenerationEnd(
-		ctx,
-		&model.Generation{
-			Output: model.M{
-				"completion": "The Q3 OKRs contain goals for multiple teams...",
-			},
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	ctx, err = l.Score(
-		ctx,
-		&model.Score{
-			Name:  "test-score",
-			Value: 0.9,
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	ctx, err = l.Event(
+	err = l.Event(
 		ctx,
 		&model.Event{
 			Name: "test-event",
@@ -152,7 +128,30 @@ func main() {
 		panic(err)
 	}
 
-	_, err = l.SpanEnd(
+	err = l.GenerationEnd(
+		ctx,
+		&model.Generation{
+			Output: model.M{
+				"completion": "The Q3 OKRs contain goals for multiple teams...",
+			},
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = l.Score(
+		ctx,
+		&model.Score{
+			Name:  "test-score",
+			Value: 0.9,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = l.SpanEnd(
 		ctx,
 		&model.Span{},
 	)
