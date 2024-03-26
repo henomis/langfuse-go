@@ -44,13 +44,13 @@ func (h *handler[T]) listen() {
 		select {
 		case <-ticker.C:
 			go h.handle()
-		case command, ok := <-h.commandCh:
+		case cmd, ok := <-h.commandCh:
 			if !ok {
 				return
 			}
 
 			h.handle()
-			if command == commandFlushAndWait {
+			if cmd == commandFlushAndWait {
 				ticker.Stop()
 				close(h.commandCh)
 			}

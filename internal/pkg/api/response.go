@@ -48,15 +48,15 @@ func (r *Response) SetBody(body io.Reader) error {
 	return nil
 }
 
-func (c *Response) AcceptContentType() string {
+func (r *Response) AcceptContentType() string {
 	return ContentTypeJSON
 }
 
-func (c *Response) Decode(body io.Reader) error {
-	return json.NewDecoder(body).Decode(c)
+func (r *Response) Decode(body io.Reader) error {
+	return json.NewDecoder(body).Decode(r)
 }
 
-func (c *Response) SetHeaders(headers restclientgo.Headers) error {
+func (r *Response) SetHeaders(_ restclientgo.Headers) error {
 	return nil
 }
 

@@ -68,27 +68,27 @@ type Generation struct {
 }
 
 type Usage struct {
-	Input      int            `json:"input,omitempty"`
-	Output     int            `json:"output,omitempty"`
-	Total      int            `json:"total,omitempty"`
-	Unit       ModelUsageUnit `json:"unit,omitempty"`
-	InputCost  float64        `json:"inputCost,omitempty"`
-	OutputCost float64        `json:"outputCost,omitempty"`
-	TotalCost  float64        `json:"totalCost,omitempty"`
+	Input      int       `json:"input,omitempty"`
+	Output     int       `json:"output,omitempty"`
+	Total      int       `json:"total,omitempty"`
+	Unit       UsageUnit `json:"unit,omitempty"`
+	InputCost  float64   `json:"inputCost,omitempty"`
+	OutputCost float64   `json:"outputCost,omitempty"`
+	TotalCost  float64   `json:"totalCost,omitempty"`
 
 	PromptTokens     int `json:"promptTokens,omitempty"`
 	CompletionTokens int `json:"completionTokens,omitempty"`
 	TotalTokens      int `json:"totalTokens,omitempty"`
 }
 
-type ModelUsageUnit string
+type UsageUnit string
 
 const (
-	ModelUsageUnitCharacters   ModelUsageUnit = "CHARACTERS"
-	ModelUsageUnitTokens       ModelUsageUnit = "TOKENS"
-	ModelUsageUnitMilliseconds ModelUsageUnit = "MILLISECONDS"
-	ModelUsageUnitSeconds      ModelUsageUnit = "SECONDS"
-	ModelUsageUnitImages       ModelUsageUnit = "IMAGES"
+	ModelUsageUnitCharacters   UsageUnit = "CHARACTERS"
+	ModelUsageUnitTokens       UsageUnit = "TOKENS"
+	ModelUsageUnitMilliseconds UsageUnit = "MILLISECONDS"
+	ModelUsageUnitSeconds      UsageUnit = "SECONDS"
+	ModelUsageUnitImages       UsageUnit = "IMAGES"
 )
 
 type Score struct {
@@ -128,3 +128,5 @@ type Event struct {
 	Version             string           `json:"version,omitempty"`
 	ID                  string           `json:"id,omitempty"`
 }
+
+type M map[string]interface{}

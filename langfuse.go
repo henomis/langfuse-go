@@ -36,7 +36,10 @@ func New() *Langfuse {
 		client:        client,
 		observer: observer.NewObserver(
 			func(events []model.IngestionEvent) {
-				ingest(client, events)
+				err := ingest(client, events)
+				if err != nil {
+					fmt.Println(err)
+				}
 			},
 		),
 	}
@@ -77,6 +80,7 @@ func (l *Langfuse) Trace(ctx context.Context, t *model.Trace) (context.Context, 
 	return ctx, nil
 }
 
+//nolint:dupl
 func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) (context.Context, error) {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
@@ -109,11 +113,12 @@ func (l *Langfuse) Generation(ctx context.Context, g *model.Generation) (context
 	return ctx, nil
 }
 
+//nolint:dupl
 func (l *Langfuse) GenerationEnd(ctx context.Context, g *model.Generation) (context.Context, error) {
 	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
 		e, pathErr := p.PopIf(path.Generation)
 		if pathErr != nil {
-			return nil, fmt.Errorf("invalid path: %v", pathErr)
+			return nil, fmt.Errorf("invalid path: %w", pathErr)
 		}
 		ctx = context.WithValue(ctx, langfuseCtxValuePath, p)
 
@@ -165,6 +170,7 @@ func (l *Langfuse) Score(ctx context.Context, s *model.Score) (context.Context, 
 	return ctx, nil
 }
 
+//nolint:dupl
 func (l *Langfuse) Span(ctx context.Context, s *model.Span) (context.Context, error) {
 	event := model.IngestionEvent{
 		ID:        uuid.New().String(),
@@ -196,11 +202,12 @@ func (l *Langfuse) Span(ctx context.Context, s *model.Span) (context.Context, er
 	return ctx, nil
 }
 
+//nolint:dupl
 func (l *Langfuse) SpanEnd(ctx context.Context, s *model.Span) (context.Context, error) {
 	if p, ok := ctx.Value(langfuseCtxValuePath).(path.Path); ok {
 		e, pathErr := p.PopIf(path.Span)
 		if pathErr != nil {
-			return nil, fmt.Errorf("invalid path: %v", pathErr)
+			return nil, fmt.Errorf("invalid path: %w", pathErr)
 		}
 		ctx = context.WithValue(ctx, langfuseCtxValuePath, p)
 

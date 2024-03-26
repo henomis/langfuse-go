@@ -2,22 +2,22 @@ package path
 
 import "fmt"
 
-type PathType string
+type Type string
 
 const (
-	Trace      PathType = "trace"
-	Generation PathType = "generation"
-	Span       PathType = "span"
+	Trace      Type = "trace"
+	Generation Type = "generation"
+	Span       Type = "span"
 )
 
 type Path []Element
 
 type Element struct {
-	Type PathType
+	Type Type
 	ID   string
 }
 
-func (p *Path) Push(t PathType, id string) {
+func (p *Path) Push(t Type, id string) {
 	*p = append(*p, Element{Type: t, ID: id})
 }
 
@@ -31,7 +31,7 @@ func (p *Path) Pop() *Element {
 	return &lastElement
 }
 
-func (p *Path) PopIf(t PathType) (*Element, error) {
+func (p *Path) PopIf(t Type) (*Element, error) {
 	if len(*p) == 0 {
 		return nil, fmt.Errorf("path is empty")
 	}

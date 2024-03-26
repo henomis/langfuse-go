@@ -87,11 +87,11 @@ func main() {
 		&model.Generation{
 			Name:  "test-generation",
 			Model: "gpt-3.5-turbo",
-			ModelParameters: map[string]interface{}{
+			ModelParameters: model.M{
 				"maxTokens":   "1000",
 				"temperature": "0.9",
 			},
-			Input: []map[string]interface{}{
+			Input: []model.M{
 				{
 					"role":    "system",
 					"content": "You are a helpful assistant.",
@@ -101,7 +101,7 @@ func main() {
 					"content": "Please generate a summary of the following documents \nThe engineering department defined the following OKR goals...\nThe marketing department defined the following OKR goals...",
 				},
 			},
-			Metadata: map[string]interface{}{
+			Metadata: model.M{
 				"key": "value",
 			},
 		},
@@ -113,7 +113,7 @@ func main() {
 	ctx, err = l.GenerationEnd(
 		ctx,
 		&model.Generation{
-			Output: map[string]interface{}{
+			Output: model.M{
 				"completion": "The Q3 OKRs contain goals for multiple teams...",
 			},
 		},
@@ -137,13 +137,13 @@ func main() {
 		ctx,
 		&model.Event{
 			Name: "test-event",
-			Metadata: map[string]interface{}{
+			Metadata: model.M{
 				"key": "value",
 			},
-			Input: map[string]interface{}{
+			Input: model.M{
 				"key": "value",
 			},
-			Output: map[string]interface{}{
+			Output: model.M{
 				"key": "value",
 			},
 		},
