@@ -23,15 +23,16 @@ type Langfuse struct {
 	path          *path.Path
 }
 
-func New() *Langfuse {
+func New(ctx context.Context) *Langfuse {
 	client := api.New()
 
 	l := &Langfuse{
 		flushInterval: defaultFlushInterval,
 		client:        client,
 		observer: observer.NewObserver(
-			func(events []model.IngestionEvent) {
-				err := ingest(client, events)
+			ctx,
+			func(ctx context.Context, events []model.IngestionEvent) {
+				err := ingest(ctx, client, events)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -48,13 +49,13 @@ func (l *Langfuse) WithFlushInterval(d time.Duration) *Langfuse {
 	return l
 }
 
-func ingest(client *api.Client, events []model.IngestionEvent) error {
+func ingest(ctx context.Context, client *api.Client, events []model.IngestionEvent) error {
 	req := api.Ingestion{
 		Batch: events,
 	}
 
 	res := api.IngestionResponse{}
-	return client.Ingestion(context.Background(), &req, &res)
+	return client.Ingestion(ctx, &req, &res)
 }
 
 func (l *Langfuse) Trace(t *model.Trace) error {

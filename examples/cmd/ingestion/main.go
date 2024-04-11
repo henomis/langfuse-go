@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	l := langfuse.New()
+	l := langfuse.New(context.Background())
 
 	err := l.Trace(&model.Trace{Name: "test-trace"})
 	if err != nil {
