@@ -68,7 +68,7 @@ func (l *Langfuse) Trace(t *model.Trace) (*model.Trace, error) {
 	return t, nil
 }
 
-func (l *Langfuse) Generation(g *model.Generation, parentID string) (*model.Generation, error) {
+func (l *Langfuse) Generation(g *model.Generation, parentID *string) (*model.Generation, error) {
 	if g.TraceID == "" {
 		traceID, err := l.createTrace(g.Name)
 		if err != nil {
@@ -79,7 +79,10 @@ func (l *Langfuse) Generation(g *model.Generation, parentID string) (*model.Gene
 	}
 
 	g.ID = buildID(&g.ID)
-	g.ParentObservationID = parentID
+
+	if parentID != nil {
+		g.ParentObservationID = *parentID
+	}
 
 	l.observer.Dispatch(
 		model.IngestionEvent{
@@ -130,7 +133,7 @@ func (l *Langfuse) Score(s *model.Score) (*model.Score, error) {
 	return s, nil
 }
 
-func (l *Langfuse) Span(s *model.Span, parentID string) (*model.Span, error) {
+func (l *Langfuse) Span(s *model.Span, parentID *string) (*model.Span, error) {
 	if s.TraceID == "" {
 		traceID, err := l.createTrace(s.Name)
 		if err != nil {
@@ -141,7 +144,10 @@ func (l *Langfuse) Span(s *model.Span, parentID string) (*model.Span, error) {
 	}
 
 	s.ID = buildID(&s.ID)
-	s.ParentObservationID = parentID
+
+	if parentID != nil {
+		s.ParentObservationID = *parentID
+	}
 
 	l.observer.Dispatch(
 		model.IngestionEvent{
@@ -176,7 +182,7 @@ func (l *Langfuse) SpanEnd(s *model.Span) (*model.Span, error) {
 	return s, nil
 }
 
-func (l *Langfuse) Event(e *model.Event, parentID string) (*model.Event, error) {
+func (l *Langfuse) Event(e *model.Event, parentID *string) (*model.Event, error) {
 	if e.TraceID == "" {
 		traceID, err := l.createTrace(e.Name)
 		if err != nil {
@@ -187,7 +193,10 @@ func (l *Langfuse) Event(e *model.Event, parentID string) (*model.Event, error) 
 	}
 
 	e.ID = buildID(&e.ID)
-	e.ParentObservationID = parentID
+
+	if parentID != nil {
+		e.ParentObservationID = *parentID
+	}
 
 	l.observer.Dispatch(
 		model.IngestionEvent{

@@ -15,7 +15,7 @@ func main() {
 		panic(err)
 	}
 
-	span, err := l.Span(&model.Span{Name: "test-span", TraceID: trace.ID}, "")
+	span, err := l.Span(&model.Span{Name: "test-span", TraceID: trace.ID}, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func main() {
 				"key": "value",
 			},
 		},
-		span.ID,
+		&span.ID,
 	)
 	if err != nil {
 		panic(err)
@@ -63,7 +63,7 @@ func main() {
 				"key": "value",
 			},
 		},
-		generation.ID,
+		&generation.ID,
 	)
 	if err != nil {
 		panic(err)
