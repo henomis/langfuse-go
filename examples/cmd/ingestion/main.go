@@ -15,7 +15,7 @@ func main() {
 		panic(err)
 	}
 
-	span, err := l.Span(&model.Span{Name: "test-span", TraceID: trace.ID}, trace.ID)
+	span, err := l.Span(&model.Span{Name: "test-span", TraceID: trace.ID}, "")
 	if err != nil {
 		panic(err)
 	}
