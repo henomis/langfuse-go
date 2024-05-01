@@ -1,6 +1,7 @@
 package observer
 
 import (
+	"context"
 	"time"
 )
 
@@ -37,19 +38,19 @@ func (h *handler[T]) withTick(period time.Duration) *handler[T] {
 	return h
 }
 
-func (h *handler[T]) listen() {
+func (h *handler[T]) listen(ctx context.Context) {
 	ticker := time.NewTicker(h.tickerPeriod)
 
 	for {
 		select {
 		case <-ticker.C:
-			go h.handle()
+			go h.handle(ctx)
 		case cmd, ok := <-h.commandCh:
 			if !ok {
 				return
 			}
 
-			h.handle()
+			h.handle(ctx)
 			if cmd == commandFlushAndWait {
 				ticker.Stop()
 				close(h.commandCh)
@@ -58,8 +59,8 @@ func (h *handler[T]) listen() {
 	}
 }
 
-func (h *handler[T]) handle() {
-	h.fn(h.queue.All())
+func (h *handler[T]) handle(ctx context.Context) {
+	h.fn(ctx, h.queue.All())
 }
 
 func (h *handler[T]) flush() {

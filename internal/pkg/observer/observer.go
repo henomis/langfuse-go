@@ -5,21 +5,21 @@ import (
 	"time"
 )
 
-type EventHandler[T any] func(events []T)
+type EventHandler[T any] func(ctx context.Context, events []T)
 
 type Observer[T any] struct {
 	queue   *queue[T]
 	handler *handler[T]
 }
 
-func NewObserver[T any](fn EventHandler[T]) *Observer[T] {
+func NewObserver[T any](ctx context.Context, fn EventHandler[T]) *Observer[T] {
 	queue := newQueue[T]()
 
 	o := &Observer[T]{
 		queue:   queue,
 		handler: newHandler(queue, fn),
 	}
-	go o.handler.listen()
+	go o.handler.listen(ctx)
 
 	return o
 }

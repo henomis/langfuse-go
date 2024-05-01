@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/henomis/langfuse-go/internal/pkg/api"
 	"github.com/henomis/langfuse-go/internal/pkg/observer"
-	"github.com/henomis/langfuse-go/internal/pkg/path"
 	"github.com/henomis/langfuse-go/model"
 )
 
@@ -20,24 +19,23 @@ type Langfuse struct {
 	flushInterval time.Duration
 	client        *api.Client
 	observer      *observer.Observer[model.IngestionEvent]
-	path          *path.Path
 }
 
-func New() *Langfuse {
+func New(ctx context.Context) *Langfuse {
 	client := api.New()
 
 	l := &Langfuse{
 		flushInterval: defaultFlushInterval,
 		client:        client,
 		observer: observer.NewObserver(
-			func(events []model.IngestionEvent) {
-				err := ingest(client, events)
+			ctx,
+			func(ctx context.Context, events []model.IngestionEvent) {
+				err := ingest(ctx, client, events)
 				if err != nil {
 					fmt.Println(err)
 				}
 			},
 		),
-		path: &path.Path{},
 	}
 
 	return l
@@ -48,215 +46,172 @@ func (l *Langfuse) WithFlushInterval(d time.Duration) *Langfuse {
 	return l
 }
 
-func ingest(client *api.Client, events []model.IngestionEvent) error {
+func ingest(ctx context.Context, client *api.Client, events []model.IngestionEvent) error {
 	req := api.Ingestion{
 		Batch: events,
 	}
 
 	res := api.IngestionResponse{}
-	return client.Ingestion(context.Background(), &req, &res)
+	return client.Ingestion(ctx, &req, &res)
 }
 
-func (l *Langfuse) Trace(t *model.Trace) error {
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeTraceCreate,
-		Timestamp: time.Now().UTC(),
-	}
-	if t.ID == "" {
-		traceID := uuid.New().String()
-		t.ID = traceID
-	}
-
-	event.Body = t
-	l.path = &path.Path{path.Element{Type: path.Trace, ID: t.ID}}
-
-	l.observer.Dispatch(event)
-
-	return nil
+func (l *Langfuse) Trace(t *model.Trace) (*model.Trace, error) {
+	t.ID = buildID(&t.ID)
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        buildID(nil),
+			Type:      model.IngestionEventTypeTraceCreate,
+			Timestamp: time.Now().UTC(),
+			Body:      t,
+		},
+	)
+	return t, nil
 }
 
-//nolint:dupl
-func (l *Langfuse) Generation(g *model.Generation) error {
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeGenerationCreate,
-		Timestamp: time.Now().UTC(),
+func (l *Langfuse) Generation(g *model.Generation, parentID *string) (*model.Generation, error) {
+	if g.TraceID == "" {
+		traceID, err := l.createTrace(g.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		g.TraceID = traceID
 	}
+
+	g.ID = buildID(&g.ID)
+
+	if parentID != nil {
+		g.ParentObservationID = *parentID
+	}
+
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        buildID(nil),
+			Type:      model.IngestionEventTypeGenerationCreate,
+			Timestamp: time.Now().UTC(),
+			Body:      g,
+		},
+	)
+	return g, nil
+}
+
+func (l *Langfuse) GenerationEnd(g *model.Generation) (*model.Generation, error) {
 	if g.ID == "" {
-		traceID := uuid.New().String()
-		g.ID = traceID
-	}
-
-	traceID, err := l.extractTraceID(g.Name)
-	if err != nil {
-		return err
-	}
-	g.TraceID = traceID
-
-	if l.path.Last().Type != path.Trace {
-		g.ParentObservationID = l.path.Last().ID
-	}
-
-	event.Body = g
-
-	l.path.Push(path.Generation, g.ID)
-
-	l.observer.Dispatch(event)
-
-	return nil
-}
-
-//nolint:dupl
-func (l *Langfuse) GenerationEnd(g *model.Generation) error {
-	generation, err := l.path.PopIf(path.Generation)
-	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
-	}
-
-	g.ID = generation.ID
-	g.TraceID = l.path.At(0).ID
-
-	if g.ID == "" {
-		return fmt.Errorf("generation ID is required")
+		return nil, fmt.Errorf("generation ID is required")
 	}
 
 	if g.TraceID == "" {
-		return fmt.Errorf("trace ID is required")
+		return nil, fmt.Errorf("trace ID is required")
 	}
 
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeGenerationUpdate,
-		Timestamp: time.Now().UTC(),
-	}
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        buildID(nil),
+			Type:      model.IngestionEventTypeGenerationUpdate,
+			Timestamp: time.Now().UTC(),
+			Body:      g,
+		},
+	)
 
-	event.Body = g
-
-	l.observer.Dispatch(event)
-
-	return nil
+	return g, nil
 }
 
-func (l *Langfuse) Score(s *model.Score) error {
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeScoreCreate,
-		Timestamp: time.Now().UTC(),
+func (l *Langfuse) Score(s *model.Score) (*model.Score, error) {
+	if s.TraceID == "" {
+		return nil, fmt.Errorf("trace ID is required")
 	}
-	if s.ID == "" {
-		traceID := uuid.New().String()
-		s.ID = traceID
-	}
+	s.ID = buildID(&s.ID)
 
-	traceID, err := l.extractTraceID(s.Name)
-	if err != nil {
-		return err
-	}
-	s.TraceID = traceID
-
-	event.Body = s
-	l.observer.Dispatch(event)
-
-	return nil
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        buildID(nil),
+			Type:      model.IngestionEventTypeScoreCreate,
+			Timestamp: time.Now().UTC(),
+			Body:      s,
+		},
+	)
+	return s, nil
 }
 
-//nolint:dupl
-func (l *Langfuse) Span(s *model.Span) error {
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeSpanCreate,
-		Timestamp: time.Now().UTC(),
-	}
-	if s.ID == "" {
-		traceID := uuid.New().String()
-		s.ID = traceID
+func (l *Langfuse) Span(s *model.Span, parentID *string) (*model.Span, error) {
+	if s.TraceID == "" {
+		traceID, err := l.createTrace(s.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		s.TraceID = traceID
 	}
 
-	traceID, err := l.extractTraceID(s.Name)
-	if err != nil {
-		return err
-	}
-	s.TraceID = traceID
+	s.ID = buildID(&s.ID)
 
-	if l.path.Last().Type != path.Trace {
-		s.ParentObservationID = l.path.Last().ID
+	if parentID != nil {
+		s.ParentObservationID = *parentID
 	}
 
-	l.path.Push(path.Span, s.ID)
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        buildID(nil),
+			Type:      model.IngestionEventTypeSpanCreate,
+			Timestamp: time.Now().UTC(),
+			Body:      s,
+		},
+	)
 
-	event.Body = s
-
-	l.observer.Dispatch(event)
-
-	return nil
+	return s, nil
 }
 
-//nolint:dupl
-func (l *Langfuse) SpanEnd(s *model.Span) error {
-	span, err := l.path.PopIf(path.Span)
-	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
-	}
-
-	s.ID = span.ID
-	s.TraceID = l.path.At(0).ID
-
+func (l *Langfuse) SpanEnd(s *model.Span) (*model.Span, error) {
 	if s.ID == "" {
-		return fmt.Errorf("span ID is required")
+		return nil, fmt.Errorf("generation ID is required")
 	}
 
 	if s.TraceID == "" {
-		return fmt.Errorf("trace ID is required")
+		return nil, fmt.Errorf("trace ID is required")
 	}
 
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeSpanUpdate,
-		Timestamp: time.Now().UTC(),
-	}
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        buildID(nil),
+			Type:      model.IngestionEventTypeSpanUpdate,
+			Timestamp: time.Now().UTC(),
+			Body:      s,
+		},
+	)
 
-	event.Body = s
-
-	l.observer.Dispatch(event)
-
-	return nil
+	return s, nil
 }
 
-func (l *Langfuse) Event(e *model.Event) error {
-	event := model.IngestionEvent{
-		ID:        uuid.New().String(),
-		Type:      model.IngestionEventTypeEventCreate,
-		Timestamp: time.Now().UTC(),
-	}
-	if e.ID == "" {
-		traceID := uuid.New().String()
-		e.ID = traceID
-	}
+func (l *Langfuse) Event(e *model.Event, parentID *string) (*model.Event, error) {
+	if e.TraceID == "" {
+		traceID, err := l.createTrace(e.Name)
+		if err != nil {
+			return nil, err
+		}
 
-	traceID, err := l.extractTraceID(e.Name)
-	if err != nil {
-		return err
-	}
-	e.TraceID = traceID
-
-	if l.path.Last().Type != path.Trace {
-		e.ParentObservationID = l.path.Last().ID
+		e.TraceID = traceID
 	}
 
-	event.Body = e
-	l.observer.Dispatch(event)
+	e.ID = buildID(&e.ID)
 
-	return nil
+	if parentID != nil {
+		e.ParentObservationID = *parentID
+	}
+
+	l.observer.Dispatch(
+		model.IngestionEvent{
+			ID:        uuid.New().String(),
+			Type:      model.IngestionEventTypeEventCreate,
+			Timestamp: time.Now().UTC(),
+			Body:      e,
+		},
+	)
+
+	return e, nil
 }
 
-func (l *Langfuse) extractTraceID(traceName string) (string, error) {
-	tracePath := l.path.At(0)
-	if tracePath != nil {
-		return tracePath.ID, nil
-	}
-
-	errTrace := l.Trace(
+func (l *Langfuse) createTrace(traceName string) (string, error) {
+	trace, errTrace := l.Trace(
 		&model.Trace{
 			Name: traceName,
 		},
@@ -265,14 +220,19 @@ func (l *Langfuse) extractTraceID(traceName string) (string, error) {
 		return "", errTrace
 	}
 
-	tracePath = l.path.At(0)
-	if tracePath != nil {
-		return tracePath.ID, nil
-	}
-
-	return "", fmt.Errorf("unable to get trace ID")
+	return trace.ID, fmt.Errorf("unable to get trace ID")
 }
 
 func (l *Langfuse) Flush(ctx context.Context) {
 	l.observer.Wait(ctx)
+}
+
+func buildID(id *string) string {
+	if id == nil {
+		return uuid.New().String()
+	} else if *id == "" {
+		return uuid.New().String()
+	}
+
+	return *id
 }

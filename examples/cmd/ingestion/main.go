@@ -8,22 +8,23 @@ import (
 )
 
 func main() {
-	l := langfuse.New()
+	l := langfuse.New(context.Background())
 
-	err := l.Trace(&model.Trace{Name: "test-trace"})
+	trace, err := l.Trace(&model.Trace{Name: "test-trace"})
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.Span(&model.Span{Name: "test-span"})
+	span, err := l.Span(&model.Span{Name: "test-span", TraceID: trace.ID}, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.Generation(
+	generation, err := l.Generation(
 		&model.Generation{
-			Name:  "test-generation",
-			Model: "gpt-3.5-turbo",
+			TraceID: trace.ID,
+			Name:    "test-generation",
+			Model:   "gpt-3.5-turbo",
 			ModelParameters: model.M{
 				"maxTokens":   "1000",
 				"temperature": "0.9",
@@ -42,14 +43,16 @@ func main() {
 				"key": "value",
 			},
 		},
+		&span.ID,
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.Event(
+	_, err = l.Event(
 		&model.Event{
-			Name: "test-event",
+			Name:    "test-event",
+			TraceID: trace.ID,
 			Metadata: model.M{
 				"key": "value",
 			},
@@ -60,33 +63,32 @@ func main() {
 				"key": "value",
 			},
 		},
+		&generation.ID,
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.GenerationEnd(
-		&model.Generation{
-			Output: model.M{
-				"completion": "The Q3 OKRs contain goals for multiple teams...",
-			},
-		},
-	)
+	generation.Output = model.M{
+		"completion": "The Q3 OKRs contain goals for multiple teams...",
+	}
+	_, err = l.GenerationEnd(generation)
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.Score(
+	_, err = l.Score(
 		&model.Score{
-			Name:  "test-score",
-			Value: 0.9,
+			TraceID: trace.ID,
+			Name:    "test-score",
+			Value:   0.9,
 		},
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	err = l.SpanEnd(&model.Span{})
+	_, err = l.SpanEnd(span)
 	if err != nil {
 		panic(err)
 	}
